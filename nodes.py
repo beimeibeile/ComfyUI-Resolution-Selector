@@ -114,7 +114,18 @@ class DBWResolutionSelector:
         r = resolve_resolution(aspect_ratio, megapixels, multiple, image=IMAGE)
         label = f"{r['width']} × {r['height']} ({r['actual_mp']:.2f} MP)"
         img_info = r["img_info"] if r["img_info"] is not None else "—"
-        return (r["width"], r["height"], round(r["actual_mp"], 4), label, img_info)
+        results = (r["width"], r["height"], round(r["actual_mp"], 4), label, img_info)
+        # ui 通道: 普通输出不会传给前端 onExecuted, 需经 ui 键回传, 前端才能禁用/更新 aspect_ratio 显示
+        return {
+            "ui": {
+                "img_info": img_info,
+                "width": int(r["width"]),
+                "height": int(r["height"]),
+                "actual_mp": round(r["actual_mp"], 4),
+                "has_image": bool(r["img_info"] is not None),
+            },
+            "result": results,
+        }
 
 
 NODE_CLASS_MAPPINGS["DBW-ResolutionSelector"] = DBWResolutionSelector
