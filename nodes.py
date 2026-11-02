@@ -109,8 +109,9 @@ class DBWResolutionSelector:
     FUNCTION = "resolve"
     CATEGORY = _CATEGORY
 
-    def resolve(self, aspect_ratio, megapixels, multiple, image=None):
-        r = resolve_resolution(aspect_ratio, megapixels, multiple, image=image)
+    def resolve(self, aspect_ratio, megapixels, multiple, IMAGE=None):
+        # 注意: 参数名必须与 INPUT_TYPES 键名一致(大写 IMAGE), ComfyUI 按定义键名展开调用
+        r = resolve_resolution(aspect_ratio, megapixels, multiple, image=IMAGE)
         label = f"{r['width']} × {r['height']} ({r['actual_mp']:.2f} MP)"
         img_info = r["img_info"] if r["img_info"] is not None else "—"
         return (r["width"], r["height"], round(r["actual_mp"], 4), label, img_info)
