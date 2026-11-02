@@ -116,13 +116,14 @@ class DBWResolutionSelector:
         img_info = r["img_info"] if r["img_info"] is not None else "—"
         results = (r["width"], r["height"], round(r["actual_mp"], 4), label, img_info)
         # ui 通道: 普通输出不会传给前端 onExecuted, 需经 ui 键回传, 前端才能禁用/更新 aspect_ratio 显示
+        # 注意: ComfyUI 要求 ui 各键值为"列表"([y for x in uis for y in x[k]] 会遍历值), 必须包成数组
         return {
             "ui": {
-                "img_info": img_info,
-                "width": int(r["width"]),
-                "height": int(r["height"]),
-                "actual_mp": round(r["actual_mp"], 4),
-                "has_image": bool(r["img_info"] is not None),
+                "img_info": [img_info],
+                "width": [int(r["width"])],
+                "height": [int(r["height"])],
+                "actual_mp": [round(r["actual_mp"], 4)],
+                "has_image": [bool(r["img_info"] is not None)],
             },
             "result": results,
         }

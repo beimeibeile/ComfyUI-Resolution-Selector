@@ -58,20 +58,21 @@ app.registerExtension({
         }
 
         // 执行完成: 读取节点 ui 通道回传(普通输出不会发给前端, 必须走 ui)
+        // ComfyUI 的 ui 值都是数组, 需解包首元素
         const onExecuted = node.onExecuted;
         node.onExecuted = function (executed) {
             if (onExecuted) onExecuted.apply(this, arguments);
             const w = ar();
             if (!w) return;
-            // ui 通道键: img_info / has_image / width / height / actual_mp
-            const info = executed?.img_info;
-            const hasImg = executed?.has_image === true;
+            const first = (x) => (Array.isArray(x) ? x[0] : x);
+            const info = first(executed?.img_info);
+            const hasImg = first(executed?.has_image) === true;
             if (hasImg && info && info !== "—" && info.includes("×")) {
-                w.value = info;          // 例: "1024×768 (4:3)"
+                w.value = info;          // 例: "768×1024 (3:4)"
                 w.disabled = true;       // 禁用, 由图片决定
-                const W = Number(executed.width), H = Number(executed.height);
+                const W = Number(first(executed?.width)), H = Number(first(executed?.height));
                 if (Number.isFinite(W) && Number.isFinite(H) && W > 0) {
-                    node.title = `Resolution Selector · ${W} × ${H} (${(+executed.actual_mp).toFixed(2)} MP)`;
+                    node.title = `Resolution Selector · ${W} × ${H} (${(+first(executed?.actual_mp)).toFixed(2)} MP)`;
                 }
             } else {
                 w.disabled = false;      // 无图片: 恢复手动选择
