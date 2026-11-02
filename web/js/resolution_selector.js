@@ -1,7 +1,7 @@
 // DBW-ResolutionSelector Live 前端扩展:
-// 仿照 "Resolution Selector (Live)": 参数变化时实时计算并显示 width × height (MP)。
-// 计算逻辑与 nodes.py resolve_resolution 保持同一公式(ceil 对齐到 multiple 倍数),
-// 显示在节点标题, 打开节点即可见, 无需执行。
+// 1) 无 IMAGE: 参数变化实时计算并显示 width × height (MP), 标题实时预览。
+// 2) 接入 IMAGE: 执行后读取后端返回的 IMG_INFO(宽高像素+比例), aspect_ratio 禁用并显示该信息;
+//    断开 IMAGE 后恢复可用。计算逻辑与 nodes.py 保持一致(ceil 对齐到 multiple 倍数)。
 import { app } from "../../../scripts/app.js";
 
 const CLS = "DBW-ResolutionSelector";
@@ -33,19 +33,20 @@ app.registerExtension({
     nodeCreated(node) {
         if (node.comfyClass !== CLS) return;
 
+        const ar = () => node.widgets?.find((w) => w.name === "aspect_ratio");
+
         const update = () => {
-            if (!node.widgets) return;
-            const ar = node.widgets.find((w) => w.name === "aspect_ratio");
-            const mp = node.widgets.find((w) => w.name === "megapixels");
-            const mu = node.widgets.find((w) => w.name === "multiple");
-            if (!ar || !mp || !mu) return;
-            const r = compute(ar.value, mp.value, mu.value);
+            const w = ar();
+            const mp = node.widgets?.find((w) => w.name === "megapixels");
+            const mu = node.widgets?.find((w) => w.name === "multiple");
+            if (!w || !mp || !mu) return;
+            const r = compute(w.value, mp.value, mu.value);
             node.title = `Resolution Selector · ${r.width} × ${r.height} (${r.mp.toFixed(2)} MP)`;
             node.setDirtyCanvas?.(true, true);
         };
 
-        // 三个参数任意变化 → 实时刷新
-        for (const w of node.widgets) {
+        // 三个参数任意变化 → 实时刷新(仅无 IMAGE 时有效, 有 IMAGE 时 aspect_ratio 已禁用)
+        for (const w of node.widgets || []) {
             if (["aspect_ratio", "megapixels", "multiple"].includes(w.name)) {
                 const orig = w.callback;
                 w.callback = function (...args) {
@@ -55,6 +56,37 @@ app.registerExtension({
                 };
             }
         }
+
+        // 执行完成: 若接入了 IMAGE, 用后端返回的 IMG_INFO 禁用 aspect_ratio 并显示"宽高像素(比例)"
+        const onExecuted = node.onExecuted;
+        node.onExecuted = function (executed) {
+            if (onExecuted) onExecuted.apply(this, arguments);
+            const w = ar();
+            if (!w) return;
+            const info = executed?.IMG_INFO;
+            if (info && info !== "—" && info.includes("×")) {
+                w.value = info;          // 例: "1024×768 (4:3)"
+                w.disabled = true;       // 禁用, 由图片决定
+                const W = Number(executed.WIDTH), H = Number(executed.HEIGHT);
+                if (Number.isFinite(W) && Number.isFinite(H) && W > 0) {
+                    node.title = `Resolution Selector · ${W} × ${H} (${(+executed.ACTUAL_MP).toFixed(2)} MP)`;
+                }
+            } else {
+                w.disabled = false;      // 无图片: 恢复手动选择
+                update();
+            }
+            node.setDirtyCanvas?.(true, true);
+        };
+
+        // IMAGE 输入断开: 立即恢复 aspect_ratio 可编辑
+        const onConn = node.onConnectionsChange;
+        node.onConnectionsChange = function (type, slot, _, linked, linkInfo) {
+            if (onConn) onConn.apply(this, arguments);
+            if (type === LiteGraph.INPUT && linkInfo?.name === "IMAGE" && !linked) {
+                const w = ar();
+                if (w) { w.disabled = false; update(); }
+            }
+        };
 
         // 初始渲染(节点创建时 widget 可能尚未就绪)
         setTimeout(update, 200);

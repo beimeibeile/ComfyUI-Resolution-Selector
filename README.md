@@ -9,11 +9,13 @@ DBW/Utils 工具类子工程：**分辨率选择器（Live）**。
 
 | 节点 | 分类 | 输入 | 输出 |
 |---|---|---|---|
-| `DBW-ResolutionSelector` | `DBW/Utils` | aspect_ratio / megapixels / multiple | WIDTH / HEIGHT / ACTUAL_MP / RATIO_LABEL |
+| `DBW-ResolutionSelector` | `DBW/Utils` | aspect_ratio / megapixels / multiple / **IMAGE(可选)** | WIDTH / HEIGHT / ACTUAL_MP / RATIO_LABEL / **IMG_INFO** |
 
 - `aspect_ratio`：预设宽高比（含方向）：1:1、4:3、3:2、16:9、21:9、3:4、2:3、9:16。
 - `megapixels`：目标总像素（百万），实际结果向上取整，可能略高于目标。
 - `multiple`：宽高对齐倍数（8-256，默认 32），结果保证是 multiple 的整数倍。
+- `IMAGE`（**可选**）：接入图片后自动识别其宽高像素，按图片实际比例计算（`aspect_ratio` 自动禁用，
+  显示如 `1024×768 (4:3)`，输出 `IMG_INFO`）；断开后恢复手动选择。
 - **Live**：参数变化实时在节点标题显示 `1024 × 768 (0.79 MP)`，无需执行即可预览。
 
 ## 计算逻辑
