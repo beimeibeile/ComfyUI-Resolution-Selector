@@ -8,7 +8,8 @@ const CLS = "DBW-ResolutionSelector";
 
 function ratioOf(label) {
     const head = String(label || "").split("(")[0].trim();
-    const [a, b] = head.split(":");
+    const sep = head.includes("×") ? "×" : ":";
+    const [a, b] = head.split(sep);
     const wa = parseFloat(a), hb = parseFloat(b);
     return (Number.isFinite(wa) && Number.isFinite(hb) && wa > 0 && hb > 0) ? [wa, hb] : [4, 3];
 }
@@ -34,6 +35,13 @@ app.registerExtension({
         if (node.comfyClass !== CLS) return;
 
         const ar = () => node.widgets?.find((w) => w.name === "aspect_ratio");
+
+        // 恢复 aspect_ratio 为最后合法预设值(默认 4:3)并解除禁用:
+        // 图片比例值不在预设 combo 列表, 若残留会导致 ComfyUI 提交校验"无效输入"
+        const restoreAspectRatio = (w) => {
+            w.value = w.__lastLegalValue || "4:3 (Standard)";
+            w.disabled = false;
+        };
 
         const update = () => {
             const w = ar();
@@ -67,6 +75,8 @@ app.registerExtension({
             const first = (x) => (Array.isArray(x) ? x[0] : x);
             const info = first(executed?.img_info);
             const hasImg = first(executed?.has_image) === true;
+            // 记录最后一次合法预设值, 断开图片后恢复(否则残留图片比例值会导致 combo 校验"无效输入")
+            if (!w.__lastLegalValue) w.__lastLegalValue = w.value;
             if (hasImg && info && info !== "—" && info.includes("×")) {
                 w.value = info;          // 例: "768×1024 (3:4)"
                 w.disabled = true;       // 禁用, 由图片决定
@@ -75,19 +85,19 @@ app.registerExtension({
                     node.title = `Resolution Selector · ${W} × ${H} (${(+first(executed?.actual_mp)).toFixed(2)} MP)`;
                 }
             } else {
-                w.disabled = false;      // 无图片: 恢复手动选择
+                restoreAspectRatio(w);   // 无图片: 恢复合法预设值并恢复可编辑
                 update();
             }
             node.setDirtyCanvas?.(true, true);
         };
 
-        // IMAGE 输入断开: 立即恢复 aspect_ratio 可编辑
+        // IMAGE 输入断开: 立即恢复 aspect_ratio 为合法预设值并可编辑
         const onConn = node.onConnectionsChange;
         node.onConnectionsChange = function (type, slot, _, linked, linkInfo) {
             if (onConn) onConn.apply(this, arguments);
             if (type === LiteGraph.INPUT && linkInfo?.name === "IMAGE" && !linked) {
                 const w = ar();
-                if (w) { w.disabled = false; update(); }
+                if (w) { restoreAspectRatio(w); update(); }
             }
         };
 

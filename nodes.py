@@ -34,13 +34,17 @@ _ASPECT_RATIOS = [
 
 
 def _ratio_of(label: str) -> tuple:
-    """从 '4:3 (Standard)' 取 (w, h)。"""
+    """从 '4:3 (Standard)' 或 '768×1024 (3:4)' 取 (w, h)。"""
     head = label.split("(")[0].strip()
-    a, _, b = head.partition(":")
+    sep = "×" if "×" in head else ":"
+    a, _, b = head.partition(sep)
     try:
-        return float(a), float(b)
+        wa, hb = float(a), float(b)
+        if wa > 0 and hb > 0:
+            return wa, hb
     except Exception:
-        return 4.0, 3.0
+        pass
+    return 4.0, 3.0
 
 
 def _ceil_mult(x: float, multiple: int) -> int:
@@ -108,6 +112,26 @@ class DBWResolutionSelector:
     RETURN_NAMES = ("WIDTH", "HEIGHT", "ACTUAL_MP", "RATIO_LABEL", "IMG_INFO")
     FUNCTION = "resolve"
     CATEGORY = _CATEGORY
+
+    @classmethod
+    def VALIDATE_INPUTS(cls, aspect_ratio=None, megapixels=None, multiple=None, **kwargs):
+        """
+        宽松校验(返回 True 表示通过):
+        aspect_ratio 运行中会被前端改写为图片比例(如 "768×1024 (3:4)"), 不在预设 combo 列表,
+        若不加 VALIDATE_INPUTS, ComfyUI 的 combo 选项检查会报"无效输入"。
+        参数名出现在签名中即跳过默认 combo/min/max 检查, 由本方法自行校验。
+        注意: ComfyUI 0.34.x 要求通过时返回 True(返回 None 会报 custom_validation_failed)。
+        """
+        if aspect_ratio is None or not str(aspect_ratio).strip():
+            return "aspect_ratio 不能为空"
+        try:
+            if megapixels is not None and not (0.05 <= float(megapixels) <= 4.0):
+                return "megapixels 超出范围 0.05-4.0"
+            if multiple is not None and not (8 <= int(multiple) <= 256):
+                return "multiple 超出范围 8-256"
+        except Exception:
+            return "megapixels/multiple 必须为数字"
+        return True
 
     def resolve(self, aspect_ratio, megapixels, multiple, IMAGE=None):
         # 注意: 参数名必须与 INPUT_TYPES 键名一致(大写 IMAGE), ComfyUI 按定义键名展开调用
